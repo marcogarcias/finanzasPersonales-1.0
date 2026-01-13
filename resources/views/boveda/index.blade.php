@@ -67,7 +67,13 @@
          <section class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
             <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
                 <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide">Comprobantes en Base de Datos</h2>
-                <span class="text-xs text-gray-400">Encontrados: <span id="fileCount" class="font-bold text-gray-800">0</span></span>
+                <div class="flex items-center gap-4">
+                    <button id="btnDeleteSelected" class="hidden flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        ELIMINAR SELECCIONADOS (<span id="selectedCount">0</span>)
+                    </button>
+                    <span class="text-xs text-gray-400">Encontrados: <span id="fileCount" class="font-bold text-gray-800">0</span></span>
+                </div>
             </div>
 
             <div class="overflow-auto flex-1 p-0 relative">
@@ -79,6 +85,9 @@
                 <table class="min-w-full leading-normal">
                     <thead class="sticky top-0 z-10">
                         <tr>
+                            <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left w-10">
+                                <input type="checkbox" id="selectAll" class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer">
+                            </th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left text-[10px] font-bold text-gray-600 uppercase">UUID / Folio</th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left text-[10px] font-bold text-gray-600 uppercase">Emisor</th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left text-[10px] font-bold text-gray-600 uppercase">Fecha</th>
@@ -89,7 +98,7 @@
                     </thead>
                     <tbody id="filesTableBody">
                         <tr>
-                            <td colspan="6" class="px-5 py-20 text-center text-gray-400 text-sm italic">
+                            <td colspan="7" class="px-5 py-20 text-center text-gray-400 text-sm italic">
                                 Use los filtros laterales para listar los comprobantes fiscales.
                             </td>
                         </tr>
@@ -125,11 +134,31 @@
     const tableLoader = document.getElementById('tableLoader');
     const fileCountLabel = document.getElementById('fileCount');
     const btnExportExcel = document.getElementById('btnExportExcel');
+    
+    // Elementos de selección masiva
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const btnDeleteSelected = document.getElementById('btnDeleteSelected');
+    const selectedCountLabel = document.getElementById('selectedCount');
 
     // --- Inicialización ---
     loadRfcs();
 
     // --- Event Listeners ---
+
+    // Selección masiva
+    selectAllCheckbox.addEventListener('change', () => {
+        const checkboxes = document.querySelectorAll('.file-checkbox');
+        checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+        updateSelectedUI();
+    });
+
+    tableBody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('file-checkbox')) {
+            updateSelectedUI();
+        }
+    });
+
+    btnDeleteSelected.addEventListener('click', bulkDeleteFiles);
 
     // 1. Select RFC -> Cargar Tipos (Clases)
     rfcSelect.addEventListener('change', () => {
@@ -297,6 +326,9 @@
             files.forEach(file => {
                 const row = `
                     <tr class="hover:bg-blue-50/30 transition border-b border-gray-100">
+                        <td class="px-5 py-3 text-left">
+                            <input type="checkbox" value="${file.id}" class="file-checkbox rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer">
+                        </td>
                         <td class="px-5 py-3 text-xs">
                             <div class="font-bold text-gray-800">${file.folio || 'S/F'}</div>
                             <div class="text-[10px] text-gray-400 font-mono">${file.uuid}</div>
@@ -329,6 +361,8 @@
             });
         }
         
+        selectAllCheckbox.checked = false;
+        updateSelectedUI();
         tableLoader.classList.add('hidden');
     }
 
@@ -353,9 +387,11 @@
     }
 
     function clearTable() {
-        tableBody.innerHTML = '<tr><td colspan="6" class="px-5 py-20 text-center text-gray-400 italic">Use los filtros laterales para listar los comprobantes fiscales.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="px-5 py-20 text-center text-gray-400 italic">Use los filtros laterales para listar los comprobantes fiscales.</td></tr>';
         fileCountLabel.innerHTML = '0';
         btnExportExcel.disabled = true;
+        selectAllCheckbox.checked = false;
+        updateSelectedUI();
     }
     
     function disableAll(bool) {
@@ -390,6 +426,65 @@
             console.error('Delete error:', e);
             showToast('Error', 'Error de conexión al eliminar', 'error');
         }
+    }
+
+    async function bulkDeleteFiles() {
+        const selectedCheckboxes = document.querySelectorAll('.file-checkbox:checked');
+        const ids = Array.from(selectedCheckboxes).map(cb => cb.value);
+        
+        if (ids.length === 0) return;
+
+        if (!confirm(`¿Está seguro de eliminar los ${ids.length} comprobantes seleccionados? Esta acción eliminará los registros de la base de datos y los archivos físicos XML.`)) {
+            return;
+        }
+
+        const originalHTML = btnDeleteSelected.innerHTML;
+        btnDeleteSelected.disabled = true;
+        btnDeleteSelected.innerHTML = '<svg class="animate-spin h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ELIMINANDO...';
+
+        try {
+            const res = await fetch(`{{ route('api.boveda.bulkDestroy') }}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ ids: ids })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast('Correcto', data.message, 'success');
+                // Recargar lista actual
+                const checkedMonths = Array.from(document.querySelectorAll('input[name="months[]"]:checked')).map(cb => cb.value);
+                loadFiles(rfcSelect.value, typeSelect.value, yearSelect.value, checkedMonths);
+            } else {
+                showToast('Error', data.error || 'No se pudieron eliminar los registros', 'error');
+            }
+        } catch (e) {
+            console.error('Bulk Delete error:', e);
+            showToast('Error', 'Error de conexión al eliminar los registros', 'error');
+        } finally {
+            btnDeleteSelected.disabled = false;
+            btnDeleteSelected.innerHTML = originalHTML;
+        }
+    }
+
+    function updateSelectedUI() {
+        const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+        selectedCountLabel.innerText = checkedCount;
+        
+        if (checkedCount > 0) {
+            btnDeleteSelected.classList.remove('hidden');
+        } else {
+            btnDeleteSelected.classList.add('hidden');
+        }
+
+        // Sincronizar selectAll
+        const totalRows = document.querySelectorAll('.file-checkbox').length;
+        selectAllCheckbox.checked = (checkedCount === totalRows && totalRows > 0);
     }
 
     function showToast(title, message, type = 'success') {

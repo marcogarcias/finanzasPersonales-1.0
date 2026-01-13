@@ -35,8 +35,13 @@
                         <div id="form-ciec" class="space-y-3">
                             <div>
                                 <label class="block text-xs font-medium mb-1 text-gray-600">RFC</label>
-                                <input type="text" name="rfc" id="rfcInput" placeholder="RFC del contribuyente"
+                                <input type="text" name="rfc" id="rfcInput" placeholder="RFC del contribuyente" list="rfc_list"
                                     class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 p-2 border text-sm uppercase">
+                                <datalist id="rfc_list">
+                                    @foreach($rfcs ?? [] as $rfc)
+                                        <option value="{{ $rfc }}"></option>
+                                    @endforeach
+                                </datalist>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1 text-gray-600">Contraseña (CIEC)</label>
@@ -472,5 +477,18 @@
     document.getElementById('captchaAnswer')?.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') submitCaptchaAnswer();
     });
+
+    // UX para el input de RFC
+    const rfcInput = document.getElementById('rfcInput');
+    if (rfcInput) {
+        rfcInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+
+        // Forzar mostrar datalist al hacer clic o focus
+        rfcInput.addEventListener('focus', function() {
+            this.setAttribute('placeholder', 'Escribe o selecciona un RFC');
+        });
+    }
 </script>
 @endpush

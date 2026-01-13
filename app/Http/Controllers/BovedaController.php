@@ -247,4 +247,40 @@ class BovedaController extends Controller
             return response()->json(['error' => 'Error al eliminar: ' . $e->getMessage()], 500);
         }
     }
+    /**
+     * API: Eliminar múltiples comprobantes y sus archivos físicos
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        
+        if (empty($ids)) {
+            return response()->json(['error' => 'No se seleccionaron registros para eliminar.'], 400);
+        }
+
+        $userId = auth()->id();
+        $comprobantes = \App\Models\Comprobante::whereIn('id', $ids)
+            ->where('user_id', $userId)
+            ->get();
+
+        $deletedCount = 0;
+        foreach ($comprobantes as $comprobante) {
+            // 1. Eliminar archivo físico si existe
+            if ($comprobante->xml_path && File::exists($comprobante->xml_path)) {
+                try {
+                    File::delete($comprobante->xml_path);
+                } catch (\Exception $fe) {
+                    \Illuminate\Support\Facades\Log::warning("No se pudo eliminar el archivo físico: " . $comprobante->xml_path);
+                }
+            }
+            // 2. Eliminar lógicamente (Soft Delete)
+            $comprobante->delete();
+            $deletedCount++;
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Se eliminaron {$deletedCount} comprobantes correctamente."
+        ]);
+    }
 }

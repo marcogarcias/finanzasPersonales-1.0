@@ -15,7 +15,15 @@ class DownloadController extends Controller
      */
     public function index()
     {
-        return view('downloads');
+        $userId = auth()->id();
+        $query = \App\Models\Comprobante::where('user_id', $userId);
+        
+        $emitidos = (clone $query)->where('clase_comprobante', 'emitido')->distinct()->pluck('rfc_emisor');
+        $recibidos = (clone $query)->where('clase_comprobante', 'recibido')->distinct()->pluck('rfc_receptor');
+        
+        $rfcs = $emitidos->merge($recibidos)->unique()->sort()->values();
+
+        return view('downloads', compact('rfcs'));
     }
 
     /**
