@@ -20,26 +20,41 @@ class InteractiveCaptchaResolver implements CaptchaResolverInterface
 
     public function resolve(CaptchaImageInterface $image): CaptchaAnswerInterface
     {
-        // 1. Convertir la imagen a Base64
         $imageContent = $image->asBinary();
         $base64Image = 'data:image/png;base64,' . base64_encode($imageContent);
 
-        // 2. Notificar a la UI que necesitamos el captcha
         $statusKey = "download_status_{$this->jobId}";
         $status = Cache::get($statusKey);
         $status['status'] = 'awaiting_captcha';
-        $status['captcha_url'] = $base64Image; // Enviamos el base64 directo
+        $status['captcha_url'] = $base64Image;
         $status['message'] = 'Por favor resuelve el captcha para continuar';
         Cache::put($statusKey, $status, 300);
 
-        // 3. Esperar a que el usuario responda (máximo 60 segundos)
         $answerKey = "captcha_answer_{$this->jobId}";
-        Cache::forget($answerKey); // Limpiar por si acaso
+        // Eliminamos el forget de aquí para evitar borrar señales de cancelación enviadas rápido 
+        // antes de entrar al loop.
 
-        for ($i = 0; $i < 60; $i++) {
+        for ($i = 0; $i < 120; $i++) {
+            // 1. Revisar si el estatus general cambió a fallido/cancelado (doble seguridad)
+            $status = Cache::get($statusKey);
+            if ($status && $status['status'] === 'failed') {
+                 throw new \RuntimeException('CAPTCHA_CANCELLED');
+            }
+
+            // 2. Revisar si hay una respuesta (incluyendo CANCEL o REFRESH)
             $answer = Cache::get($answerKey);
+            
             if ($answer) {
                 Cache::forget($answerKey);
+                
+                if ($answer === 'REFRESH') {
+                    throw new \RuntimeException('CAPTCHA_REFRESH_REQUESTED');
+                }
+                
+                if ($answer === 'CANCEL') {
+                    throw new \RuntimeException('CAPTCHA_CANCELLED');
+                }
+                
                 return new CaptchaAnswer($answer);
             }
             sleep(1);

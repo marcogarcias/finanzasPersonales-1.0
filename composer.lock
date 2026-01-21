@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b9e4422b008d4435aa056c6d63f716d4",
+    "content-hash": "6e21eb52d7fc9d517c24312add14a785",
     "packages": [
         {
             "name": "brick/math",
@@ -3321,6 +3321,61 @@
                 "source": "https://github.com/phpcfdi/image-captcha-resolver"
             },
             "time": "2025-09-13T20:00:42+00:00"
+        },
+        {
+            "name": "phpcfdi/sat-estado-cfdi",
+            "version": "v1.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpcfdi/sat-estado-cfdi.git",
+                "reference": "a836ddd0578b2c042840a232c4a37417798cf0a2"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpcfdi/sat-estado-cfdi/zipball/a836ddd0578b2c042840a232c4a37417798cf0a2",
+                "reference": "a836ddd0578b2c042840a232c4a37417798cf0a2",
+                "shasum": ""
+            },
+            "require": {
+                "eclipxe/enum": "^0.2",
+                "php": ">=7.3"
+            },
+            "require-dev": {
+                "phpcfdi/cfdi-expresiones": "^3.0",
+                "phpunit/phpunit": "^9.5"
+            },
+            "suggest": {
+                "phpcfdi/cfdi-expresiones": "Genera expresiones de CFDI 3.3, CFDI 3.2 y RET 1.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "PhpCfdi\\SatEstadoCfdi\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carlos C Soto",
+                    "email": "eclipxe13@gmail.com"
+                }
+            ],
+            "description": "Consulta el estado de un cfdi en el webservice del SAT",
+            "homepage": "https://github.com/phpcfdi/sat-estado-cfdi",
+            "keywords": [
+                "ConsultaCFDIService.svc",
+                "cfdi",
+                "phpcfdi",
+                "sat"
+            ],
+            "support": {
+                "issues": "https://github.com/phpcfdi/sat-estado-cfdi/issues",
+                "source": "https://github.com/phpcfdi/sat-estado-cfdi"
+            },
+            "time": "2022-02-23T04:35:50+00:00"
         },
         {
             "name": "phpoption/phpoption",

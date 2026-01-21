@@ -15,7 +15,8 @@
         "laravel/tinker": "^2.9",
         "nativephp/electron": "^1.3",
         "phpcfdi/cfdi-sat-scraper": "^5.0",
-        "phpcfdi/cfdi-to-json": "^0.4.0"
+        "phpcfdi/cfdi-to-json": "^0.4.0",
+        "phpcfdi/sat-estado-cfdi": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

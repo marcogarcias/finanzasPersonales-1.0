@@ -40,6 +40,7 @@ Route::middleware(['auth', 'license'])->group(function () {
     Route::get('/api/boveda/files', [BovedaController::class, 'getFiles'])->name('api.boveda.files');
     Route::get('/api/boveda/export', [BovedaController::class, 'export'])->name('api.boveda.export');
     Route::delete('/api/boveda', [BovedaController::class, 'bulkDestroy'])->name('api.boveda.bulkDestroy');
+    Route::post('/api/boveda/check-status', [BovedaController::class, 'bulkCheckStatus'])->name('api.boveda.bulkCheckStatus');
     Route::delete('/api/boveda/{id}', [BovedaController::class, 'destroy'])->name('api.boveda.destroy');
 
 });

@@ -68,9 +68,13 @@
             <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
                 <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide">Comprobantes en Base de Datos</h2>
                 <div class="flex items-center gap-4">
+                    <button id="btnCheckStatus" class="hidden flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        VERIFICAR ESTATUS (<span id="checkCount">0</span>)
+                    </button>
                     <button id="btnDeleteSelected" class="hidden flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        ELIMINAR SELECCIONADOS (<span id="selectedCount">0</span>)
+                        ELIMINAR (<span id="selectedCount">0</span>)
                     </button>
                     <span class="text-xs text-gray-400">Encontrados: <span id="fileCount" class="font-bold text-gray-800">0</span></span>
                 </div>
@@ -92,13 +96,14 @@
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left text-[10px] font-bold text-gray-600 uppercase">Emisor</th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left text-[10px] font-bold text-gray-600 uppercase">Fecha</th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-left text-[10px] font-bold text-gray-600 uppercase">Tipo</th>
+                            <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-center text-[10px] font-bold text-gray-600 uppercase">Estatus SAT</th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-right text-[10px] font-bold text-gray-600 uppercase">Total</th>
                             <th class="px-5 py-3 border-b border-gray-200 bg-gray-100 text-center text-[10px] font-bold text-gray-600 uppercase">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="filesTableBody">
                         <tr>
-                            <td colspan="7" class="px-5 py-20 text-center text-gray-400 text-sm italic">
+                            <td colspan="8" class="px-5 py-20 text-center text-gray-400 text-sm italic">
                                 Use los filtros laterales para listar los comprobantes fiscales.
                             </td>
                         </tr>
@@ -139,6 +144,8 @@
     const selectAllCheckbox = document.getElementById('selectAll');
     const btnDeleteSelected = document.getElementById('btnDeleteSelected');
     const selectedCountLabel = document.getElementById('selectedCount');
+    const btnCheckStatus = document.getElementById('btnCheckStatus');
+    const checkCountLabel = document.getElementById('checkCount');
 
     // --- Inicialización ---
     loadRfcs();
@@ -159,6 +166,7 @@
     });
 
     btnDeleteSelected.addEventListener('click', bulkDeleteFiles);
+    btnCheckStatus.addEventListener('click', bulkCheckStatus);
 
     // 1. Select RFC -> Cargar Tipos (Clases)
     rfcSelect.addEventListener('change', () => {
@@ -321,7 +329,7 @@
         btnExportExcel.disabled = files.length === 0;
 
         if (files.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="px-5 py-20 text-center text-gray-400 italic">No se encontraron registros coincidentes.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="8" class="px-5 py-20 text-center text-gray-400 italic">No se encontraron registros coincidentes.</td></tr>';
         } else {
             files.forEach(file => {
                 const row = `
@@ -342,6 +350,11 @@
                         <td class="px-5 py-3 text-xs text-center">
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${file.tipo === 'I' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
                                 ${file.tipo}
+                            </span>
+                        </td>
+                        <td class="px-5 py-3 text-xs text-center">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border ${getStatusStyles(file.estado)}">
+                                ${file.estado ? file.estado.toUpperCase() : 'DESCONOCIDO'}
                             </span>
                         </td>
                         <td class="px-5 py-3 text-sm text-right font-bold text-gray-900">
@@ -367,6 +380,21 @@
     }
 
     // --- Utils ---
+    function getStatusStyles(estado) {
+        if (!estado) return 'bg-gray-100 text-gray-600 border-gray-200';
+        
+        switch (estado.toLowerCase()) {
+            case 'vigente':
+                return 'bg-green-50 text-green-700 border-green-200';
+            case 'cancelado':
+                return 'bg-red-50 text-red-700 border-red-200';
+            case 'no encontrado':
+                return 'bg-amber-50 text-amber-700 border-amber-200';
+            default:
+                return 'bg-blue-50 text-blue-700 border-blue-200';
+        }
+    }
+
     function resetFilters(level) {
         if(level === 'rfc') {
             rfcSelect.value = '';
@@ -428,6 +456,46 @@
         }
     }
 
+    async function bulkCheckStatus() {
+        const selectedCheckboxes = document.querySelectorAll('.file-checkbox:checked');
+        const ids = Array.from(selectedCheckboxes).map(cb => cb.value);
+        
+        if (ids.length === 0) return;
+
+        const originalHTML = btnCheckStatus.innerHTML;
+        btnCheckStatus.disabled = true;
+        btnCheckStatus.innerHTML = '<svg class="animate-spin h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> VERIFICANDO...';
+
+        try {
+            const res = await fetch(`{{ route('api.boveda.bulkCheckStatus') }}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ ids: ids })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast('Correcto', data.message, 'success');
+                // Recargar lista actual
+                const checkedMonths = Array.from(document.querySelectorAll('input[name="months[]"]:checked')).map(cb => cb.value);
+                loadFiles(rfcSelect.value, typeSelect.value, yearSelect.value, checkedMonths);
+            } else {
+                showToast('Error', data.error || 'No se pudo verificar el estatus', 'error');
+            }
+        } catch (e) {
+            console.error('Bulk Check Status error:', e);
+            showToast('Error', 'Error de conexión al verificar el estatus', 'error');
+        } finally {
+            btnCheckStatus.disabled = false;
+            btnCheckStatus.innerHTML = originalHTML;
+        }
+    }
+
     async function bulkDeleteFiles() {
         const selectedCheckboxes = document.querySelectorAll('.file-checkbox:checked');
         const ids = Array.from(selectedCheckboxes).map(cb => cb.value);
@@ -475,11 +543,14 @@
     function updateSelectedUI() {
         const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
         selectedCountLabel.innerText = checkedCount;
+        checkCountLabel.innerText = checkedCount;
         
         if (checkedCount > 0) {
             btnDeleteSelected.classList.remove('hidden');
+            btnCheckStatus.classList.remove('hidden');
         } else {
             btnDeleteSelected.classList.add('hidden');
+            btnCheckStatus.classList.add('hidden');
         }
 
         // Sincronizar selectAll

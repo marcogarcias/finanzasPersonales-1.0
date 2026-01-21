@@ -166,17 +166,26 @@
     <div id="captchaModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all animate-bounce-short">
             <div class="p-6">
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800">Resolución de Captcha</h3>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-800">Resolución de Captcha</h3>
+                    <button type="button" onclick="closeCaptchaModal()" class="text-gray-400 hover:text-gray-600 transition p-1">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
                 </div>
                 
                 <p class="text-sm text-gray-500 mb-6">El SAT solicita verificación. Por favor ingresa los caracteres que ves en la imagen:</p>
                 
-                <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6 flex justify-center">
+                <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6 flex flex-col items-center gap-3">
                     <img id="captchaImage" src="" alt="Captcha SAT" class="h-12 object-contain rounded shadow-sm bg-white p-1">
+                    <button type="button" onclick="refreshCaptcha()" id="btnRefreshCaptcha" class="flex items-center gap-2 text-[10px] font-bold text-blue-600 hover:text-blue-800 transition uppercase tracking-widest">
+                        <svg id="refreshIcon" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Refrescar Imagen
+                    </button>
                 </div>
 
                 <input type="hidden" id="captchaJobId">
@@ -389,13 +398,24 @@
             const captchaImg = document.getElementById('captchaImage');
             const jobIdInput = document.getElementById('captchaJobId');
             
-            // Si el modal está oculto, lo mostramos con los datos del job
+            jobIdInput.value = jobId;
+
+            // Si el modal está oculto, lo mostramos
             if (modal.classList.contains('hidden')) {
-                captchaImg.src = data.captcha_url; // Base64 directo
-                jobIdInput.value = jobId;
+                captchaImg.src = data.captcha_url;
                 modal.classList.remove('hidden');
                 document.getElementById('captchaAnswer').value = '';
                 document.getElementById('captchaAnswer').focus();
+            } else {
+                // Si ya está abierto pero la imagen cambió (porque pedimos refresh o falló)
+                if (captchaImg.src !== data.captcha_url) {
+                    captchaImg.src = data.captcha_url;
+                    document.getElementById('captchaAnswer').value = '';
+                    document.getElementById('captchaAnswer').focus();
+                    // Rehabilitar botones si estaban en loading
+                    document.getElementById('btnRefreshCaptcha').disabled = false;
+                    document.getElementById('refreshIcon').classList.remove('animate-spin');
+                }
             }
         }
 
@@ -433,17 +453,23 @@
         }
     }
 
-    async function submitCaptchaAnswer() {
+    async function submitCaptchaAnswer(forcedAnswer = null) {
         const jobId = document.getElementById('captchaJobId').value;
-        const answer = document.getElementById('captchaAnswer').value;
+        let answer = forcedAnswer || document.getElementById('captchaAnswer').value;
+        
+        // Forzamos mayúsculas siempre para el SAT
+        if (answer) answer = answer.toUpperCase().trim();
+        
         const btn = document.getElementById('btnSubmitCaptcha');
         const spinner = document.getElementById('captchaSpinner');
         const modal = document.getElementById('captchaModal');
 
         if (!answer) return;
 
-        btn.disabled = true;
-        spinner.classList.remove('hidden');
+        if (!forcedAnswer) {
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+        }
 
         try {
             const response = await fetch('{{ route("captcha.submit") }}', {
@@ -460,23 +486,52 @@
 
             const data = await response.json();
             if (data.success) {
-                modal.classList.add('hidden');
+                if (!forcedAnswer) {
+                    modal.classList.add('hidden');
+                }
             } else {
-                alert('Error al enviar captcha');
+                if (!forcedAnswer) alert('Error al enviar captcha');
             }
         } catch (error) {
             console.error(error);
-            alert('Error de conexión al enviar captcha');
+            if (!forcedAnswer) alert('Error de conexión al enviar captcha');
         } finally {
-            btn.disabled = false;
-            spinner.classList.add('hidden');
+            if (!forcedAnswer) {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
         }
     }
 
-    // Permitir enviar con Enter
-    document.getElementById('captchaAnswer')?.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') submitCaptchaAnswer();
-    });
+    async function refreshCaptcha() {
+        const btn = document.getElementById('btnRefreshCaptcha');
+        const icon = document.getElementById('refreshIcon');
+        
+        btn.disabled = true;
+        icon.classList.add('animate-spin');
+        
+        // Enviamos una respuesta que forzará al SAT a fallar y darnos otro captcha
+        await submitCaptchaAnswer('REFRESH');
+    }
+
+    // Permitir enviar con Enter y forzar mayúsculas en tiempo real
+    const captchaInput = document.getElementById('captchaAnswer');
+    if (captchaInput) {
+        captchaInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') submitCaptchaAnswer();
+        });
+        
+        captchaInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    }
+
+    function closeCaptchaModal() {
+        if (confirm('Al cerrar esta ventana se cancelará el proceso de descarga actual. ¿Deseas continuar?')) {
+            submitCaptchaAnswer('CANCEL');
+            document.getElementById('captchaModal').classList.add('hidden');
+        }
+    }
 
     // UX para el input de RFC
     const rfcInput = document.getElementById('rfcInput');

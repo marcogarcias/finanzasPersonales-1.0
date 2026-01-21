@@ -145,8 +145,9 @@ return [
         'default' => [
             'queues' => ['default'],
             'memory_limit' => 128,
-            'timeout' => 3600, // Aumentado a 1 hora
+            'timeout' => 0, // Desactivar timeout para evitar cierres tras suspensión del PC
             'sleep' => 3,
+            'max_jobs' => 500, // Reiniciar el proceso cada 500 tareas para limpiar memoria
         ],
     ],
 

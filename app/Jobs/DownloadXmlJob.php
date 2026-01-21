@@ -54,6 +54,9 @@ class DownloadXmlJob implements ShouldQueue
      */
     public function handle()
     {
+        // Forzar tiempo de ejecución ilimitado para este proceso
+        set_time_limit(0);
+        
         $jobId = $this->payload['job_id'];
         
         try {
@@ -61,42 +64,70 @@ class DownloadXmlJob implements ShouldQueue
             $modeLabel = ($authMode === 'ciec') ? 'Contraseña (CIEC)' : 'e.firma (FIEL)';
             $this->updateStatus($jobId, 'started', 5, "Autenticando con {$modeLabel}...");
 
-            if ($authMode === 'ciec') {
-                // 1. Autenticación con CIEC + Resolución Manual e Interactiva
-                $rfc = $this->payload['rfc'];
-                $password = $this->payload['password'];
-                $captchaResolver = new \App\Services\InteractiveCaptchaResolver($jobId);
-                $sessionData = new CiecSessionData($rfc, $password, $captchaResolver);
-                $sessionManager = new CiecSessionManager($sessionData);
-            } else {
-                // 1. Autenticación con FIEL
-                $credential = Credential::openFiles(
-                    $this->payload['cert_path'],
-                    $this->payload['key_path'],
-                    $this->payload['password']
-                );
-                $rfc = $credential->rfc();
-                $sessionData = new FielSessionData($credential);
-                $sessionManager = new FielSessionManager($sessionData);
+            $scraper = null;
+            $list = null;
+            $maxCaptchaRetries = 10;
+            $captchaRetryCount = 0;
+
+            while ($captchaRetryCount < $maxCaptchaRetries) {
+                try {
+                    if ($authMode === 'ciec') {
+                        $rfc = $this->payload['rfc'];
+                        $password = $this->payload['password'];
+                        $captchaResolver = new \App\Services\InteractiveCaptchaResolver($jobId);
+                        $sessionData = new CiecSessionData($rfc, $password, $captchaResolver);
+                        $sessionManager = new CiecSessionManager($sessionData);
+                    } else {
+                        $credential = Credential::openFiles(
+                            $this->payload['cert_path'],
+                            $this->payload['key_path'],
+                            $this->payload['password']
+                        );
+                        $rfc = $credential->rfc();
+                        $sessionData = new FielSessionData($credential);
+                        $sessionManager = new FielSessionManager($sessionData);
+                    }
+                    
+                    $scraper = new SatScraper($sessionManager);
+                    $this->updateStatus($jobId, 'searching', 15, "Autenticado como {$rfc}. Buscando CFDI...");
+
+                    // 3. Configurar Query
+                    $start = new DateTimeImmutable($this->payload['start_date']);
+                    $end = new DateTimeImmutable($this->payload['end_date']);
+                    
+                    $downloadType = $this->payload['download_type'] === 'emitidos' 
+                        ? DownloadType::emitidos() 
+                        : DownloadType::recibidos();
+
+                    $query = new QueryByFilters($start, $end);
+                    $query->setDownloadType($downloadType);
+
+                    // 4. Obtener Lista de CFDI (Metadata) - Esto dispara el LOGIN y el CAPTCHA
+                    $list = $scraper->listByPeriod($query);
+                    
+                    // Si llegamos aquí, login exitoso
+                    break;
+
+                } catch (\Throwable $e) {
+                    // Si nosotros pedimos refrescar (o la librería envolvió nuestra petición)
+                    $msg = $e->getMessage();
+                    $prev = $e->getPrevious()?->getMessage();
+                    
+                    if ($msg === 'CAPTCHA_REFRESH_REQUESTED' || $prev === 'CAPTCHA_REFRESH_REQUESTED') {
+                        $captchaRetryCount++;
+                        $this->updateStatus($jobId, 'awaiting_captcha', 15, "Solicitando nueva imagen al SAT (Intento {$captchaRetryCount})...");
+                        continue;
+                    }
+
+                    if ($msg === 'CAPTCHA_CANCELLED' || $prev === 'CAPTCHA_CANCELLED') {
+                        $this->updateStatus($jobId, 'failed', 0, "Descarga cancelada por el usuario.");
+                        return; // Termina el Job completamente
+                    }
+
+                    // Si es otro error (como error de login real del SAT), lanzamos la excepción
+                    throw $e;
+                }
             }
-            
-            $scraper = new SatScraper($sessionManager);
-
-            $this->updateStatus($jobId, 'searching', 15, "Autenticado como {$rfc}. Buscando CFDI...");
-
-            // 3. Configurar Query
-            $start = new DateTimeImmutable($this->payload['start_date']);
-            $end = new DateTimeImmutable($this->payload['end_date']);
-            
-            $downloadType = $this->payload['download_type'] === 'emitidos' 
-                ? DownloadType::emitidos() 
-                : DownloadType::recibidos();
-
-            $query = new QueryByFilters($start, $end);
-            $query->setDownloadType($downloadType);
-
-            // 4. Obtener Lista de CFDI (Metadata)
-            $list = $scraper->listByPeriod($query);
             $total = count($list);
 
             if ($total === 0) {
@@ -171,18 +202,29 @@ class DownloadXmlJob implements ShouldQueue
                         if (File::exists($filePath)) {
                             try {
                                 $xmlContent = File::get($filePath);
+                                $satStatus = $metadata->get('estatus'); // Obtener estatus real desde metadata del SAT
+                                
                                 $parsedData = CfdiParser::parse(
                                     $xmlContent, 
                                     $this->payload['user_id'], 
                                     $clase, 
-                                    $filePath
+                                    $filePath,
+                                    $satStatus
                                 );
 
-                                // Guardar o actualizar en BD (Uso de updateOrCreate por integridad)
-                                Comprobante::updateOrCreate(
-                                    ['uuid' => $uuid],
-                                    $parsedData
-                                );
+                                // Guardar o actualizar en BD (Soportando registros previamente eliminados suavemente)
+                                // Usamos el UUID extraído del XML para la búsqueda por mayor precisión
+                                $uuidFromXml = $parsedData['uuid'];
+                                $comprobante = Comprobante::withTrashed()->where('uuid', 'LIKE', $uuidFromXml)->first();
+                                
+                                if ($comprobante) {
+                                    if ($comprobante->trashed()) {
+                                        $comprobante->restore();
+                                    }
+                                    $comprobante->update($parsedData);
+                                } else {
+                                    Comprobante::create($parsedData);
+                                }
                             } catch (\Exception $e) {
                                 \Illuminate\Support\Facades\Log::error("Error procesando XML {$uuid}: " . $e->getMessage());
                             }
@@ -202,9 +244,10 @@ class DownloadXmlJob implements ShouldQueue
 
 
         } catch (Throwable $e) {
-            $this->updateStatus($jobId, 'failed', 0, 'Error: ' . $e->getMessage());
-            
+            $this->updateStatus($jobId, 'failed', 0, 'Error crítico: ' . $e->getMessage());
             \Illuminate\Support\Facades\Log::error($e);
+        } finally {
+            // Asegurarnos de cerrar cualquier recurso si fuera necesario
         }
     }
 

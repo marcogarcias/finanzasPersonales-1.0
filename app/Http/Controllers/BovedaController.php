@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Finder\SplFileInfo;
 use Native\Laravel\Dialog;
+use PhpCfdi\SatEstadoCfdi\Consumer;
+use App\Services\HttpSatConsumerClient;
 
 class BovedaController extends Controller
 {
@@ -119,6 +121,7 @@ class BovedaController extends Controller
                 'total' => '$' . number_format($c->total, 2),
                 'moneda' => $c->moneda,
                 'tipo' => $c->tipo_comprobante,
+                'estado' => $c->estado_sat,
                 'xml_name' => $c->archivo_xml
             ];
         });
@@ -235,8 +238,8 @@ class BovedaController extends Controller
                 }
             }
 
-            // 2. Eliminar lógicamente (Soft Delete)
-            $comprobante->delete();
+            // 2. Eliminar definitivamente (Force Delete)
+            $comprobante->forceDelete();
 
             return response()->json([
                 'status' => 'success', 
@@ -273,14 +276,64 @@ class BovedaController extends Controller
                     \Illuminate\Support\Facades\Log::warning("No se pudo eliminar el archivo físico: " . $comprobante->xml_path);
                 }
             }
-            // 2. Eliminar lógicamente (Soft Delete)
-            $comprobante->delete();
+            // 2. Eliminar definitivamente (Force Delete)
+            $comprobante->forceDelete();
             $deletedCount++;
         }
 
         return response()->json([
             'status' => 'success',
             'message' => "Se eliminaron {$deletedCount} comprobantes correctamente."
+        ]);
+    }
+
+    /**
+     * Verifica el estatus de los comprobantes seleccionados ante el SAT.
+     */
+    public function bulkCheckStatus(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        $comprobantes = \App\Models\Comprobante::whereIn('id', $ids)->get();
+        
+        if ($comprobantes->isEmpty()) {
+            return response()->json(['error' => 'No se seleccionaron comprobantes válidos.'], 400);
+        }
+
+        // Usamos nuestro cliente HTTP personalizado para evitar depender de la extensión SOAP
+        $client = new HttpSatConsumerClient();
+        $consumer = new Consumer($client);
+        
+        $updatedCount = 0;
+        $totalVerified = 0;
+        
+        foreach ($comprobantes as $comprobante) {
+            $totalVerified++;
+            
+            // El total debe estar formateado a 6 decimales para la consulta al SAT
+            $total = number_format($comprobante->total, 6, '.', '');
+            $expression = "?re={$comprobante->rfc_emisor}&rr={$comprobante->rfc_receptor}&tt={$total}&id={$comprobante->uuid}";
+            
+            try {
+                $response = $consumer->execute($expression);
+                
+                // Valores posibles: Vigente, Cancelado, No Encontrado
+                $nuevoEstado = strtolower($response->document()->value());
+                $estadoAnterior = strtolower((string)$comprobante->estado_sat);
+                
+                // Solo actualizar e incrementar si el estado cambió
+                if ($nuevoEstado && $nuevoEstado !== $estadoAnterior) {
+                    $comprobante->estado_sat = $nuevoEstado;
+                    $comprobante->save();
+                    $updatedCount++;
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Error verificando estatus de CFDI {$comprobante->uuid}: " . $e->getMessage());
+            }
+        }
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => "Se verificaron {$totalVerified} comprobantes. Cambios detectados: {$updatedCount}."
         ]);
     }
 }

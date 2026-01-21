@@ -16,7 +16,7 @@ class CfdiParser
      * @param string $xmlPath Ruta física del archivo.
      * @return array
      */
-    public static function parse(string $xmlContent, int $userId, string $clase, string $xmlPath): array
+    public static function parse(string $xmlContent, int $userId, string $clase, string $xmlPath, string $satStatus = null): array
     {
         // Convertir XML a Array usando la librería de phpcfdi
         $data = JsonConverter::convertToArray($xmlContent);
@@ -96,8 +96,8 @@ class CfdiParser
         return [
             'user_id' => $userId,
             'clase_comprobante' => $clase,
-            'uuid' => $timbre['UUID'] ?? null,
-            'estado_sat' => 'vigente', // Por defecto al descargar/importar
+            'uuid' => isset($timbre['UUID']) ? strtolower(trim($timbre['UUID'])) : null,
+            'estado_sat' => $satStatus ? strtolower($satStatus) : 'vigente',
             'no_certificado' => $comprobante['NoCertificado'] ?? '',
             'no_certificado_sat' => $timbre['NoCertificadoSAT'] ?? '',
             'version' => $comprobante['Version'] ?? '4.0',

@@ -149,8 +149,15 @@ class DownloadController extends Controller
         $statusKey = "download_status_{$jobId}";
         $status = \Illuminate\Support\Facades\Cache::get($statusKey);
         if ($status) {
-            $status['status'] = 'processing';
-            $status['message'] = 'Captcha recibido, continuando...';
+            if ($answer === 'REFRESH') {
+                $status['message'] = 'Solicitando nuevo captcha...';
+            } elseif ($answer === 'CANCEL') {
+                $status['status'] = 'failed';
+                $status['message'] = 'Cancelando descarga...';
+            } else {
+                $status['status'] = 'processing';
+                $status['message'] = 'Captcha recibido, continuando...';
+            }
             \Illuminate\Support\Facades\Cache::put($statusKey, $status, 300);
         }
 
