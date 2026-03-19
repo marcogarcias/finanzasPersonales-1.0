@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\BovedaController;
+use App\Http\Controllers\ProveedorController;
 
 // Rutas de Autenticación
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -42,6 +43,13 @@ Route::middleware(['auth', 'license'])->group(function () {
     Route::delete('/api/boveda', [BovedaController::class, 'bulkDestroy'])->name('api.boveda.bulkDestroy');
     Route::post('/api/boveda/check-status', [BovedaController::class, 'bulkCheckStatus'])->name('api.boveda.bulkCheckStatus');
     Route::delete('/api/boveda/{id}', [BovedaController::class, 'destroy'])->name('api.boveda.destroy');
+    
+    // Rutas de Proveedores
+    Route::get('/proveedores', [ProveedorController::class, 'index'])->name('proveedores.index');
+    Route::get('/api/proveedores', [ProveedorController::class, 'getProveedores'])->name('api.proveedores.index');
+    Route::get('/api/proveedores/conceptos', [ProveedorController::class, 'getConceptos'])->name('api.proveedores.conceptos');
+    Route::put('/api/proveedores/{id}', [ProveedorController::class, 'update'])->name('api.proveedores.update');
+    Route::delete('/api/proveedores/{id}', [ProveedorController::class, 'destroy'])->name('api.proveedores.destroy');
 
 });
 

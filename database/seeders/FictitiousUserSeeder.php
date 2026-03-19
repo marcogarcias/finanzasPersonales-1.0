@@ -18,7 +18,7 @@ class FictitiousUserSeeder extends Seeder
                 'name' => 'Premium User',
                 'password' => \Illuminate\Support\Facades\Hash::make('userpremium123'),
                 'plan_type' => 'paid',
-                'license_expires_at' => now()->addWeek(),
+                'license_expires_at' => now()->addMonth(),
                 'remote_user_id' => 12345,
             ]
         );

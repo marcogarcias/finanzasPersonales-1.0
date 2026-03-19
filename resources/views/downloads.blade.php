@@ -38,8 +38,8 @@
                                 <input type="text" name="rfc" id="rfcInput" placeholder="RFC del contribuyente" list="rfc_list"
                                     class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 p-2 border text-sm uppercase">
                                 <datalist id="rfc_list">
-                                    @foreach($rfcs ?? [] as $rfc)
-                                        <option value="{{ $rfc }}"></option>
+                                    @foreach($rfcs ?? [] as $rfcObj)
+                                        <option value="{{ $rfcObj->rfc }}"></option>
                                     @endforeach
                                 </datalist>
                             </div>
@@ -287,6 +287,12 @@
         spinner.classList.remove('hidden');
 
         const formData = new FormData(form);
+
+        console.log('============================');
+        console.log('DEBUG FECHAS ENVIADAS (FRONTEND)');
+        console.log('Fecha Inicio:', formData.get('start_date'));
+        console.log('Fecha Fin:', formData.get('end_date'));
+        console.log('============================');
 
         try {
             const response = await fetch('{{ route("download.start") }}', {
@@ -536,8 +542,20 @@
     // UX para el input de RFC
     const rfcInput = document.getElementById('rfcInput');
     if (rfcInput) {
+        // Auto-completar contraseña si el RFC está en la lista de conocidos
+        const knownRfcs = @json(($rfcs ?? [])->mapWithKeys(fn($item) => [$item->rfc => $item->password]));
+        
         rfcInput.addEventListener('input', function() {
             this.value = this.value.toUpperCase();
+            const rfc = this.value;
+            const passCiec = document.getElementById('passCiec');
+            
+            if (knownRfcs[rfc]) {
+                passCiec.value = knownRfcs[rfc];
+                // Efecto visual sutil para indicar autocompletado
+                passCiec.classList.add('bg-blue-50');
+                setTimeout(() => passCiec.classList.remove('bg-blue-50'), 1000);
+            }
         });
 
         // Forzar mostrar datalist al hacer clic o focus

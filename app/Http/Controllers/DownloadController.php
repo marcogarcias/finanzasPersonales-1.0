@@ -16,12 +16,9 @@ class DownloadController extends Controller
     public function index()
     {
         $userId = auth()->id();
-        $query = \App\Models\Comprobante::where('user_id', $userId);
-        
-        $emitidos = (clone $query)->where('clase_comprobante', 'emitido')->distinct()->pluck('rfc_emisor');
-        $recibidos = (clone $query)->where('clase_comprobante', 'recibido')->distinct()->pluck('rfc_receptor');
-        
-        $rfcs = $emitidos->merge($recibidos)->unique()->sort()->values();
+        $rfcs = \App\Models\Rfc::where('user_id', $userId)
+            ->orderBy('rfc', 'asc')
+            ->get();
 
         return view('downloads', compact('rfcs'));
     }
@@ -65,9 +62,30 @@ class DownloadController extends Controller
             'user_id' => auth()->id(),
         ];
 
+        \Illuminate\Support\Facades\Log::info('============================');
+        \Illuminate\Support\Facades\Log::info('DEBUG FECHAS (BACKEND CONTROLLER)', [
+            'start_date' => $payload['start_date'],
+            'end_date' => $payload['end_date'],
+        ]);
+        \Illuminate\Support\Facades\Log::info('============================');
+
+        // FORZAR LOG EN CARPETA DEL PROYECTO PARA ASEGURARNOS DE LEERLO AÚN EN NATIVEPHP
+        $debugString = "[" . date('Y-m-d H:i:s') . "] START: {$payload['start_date']} | END: {$payload['end_date']}\n";
+        @file_put_contents('c:\wamp64\www\laravel\finanzas-1.0\fechas_recibidas_backend.txt', $debugString, FILE_APPEND);
+
         if ($authMode === 'ciec') {
-            $payload['rfc'] = $request->input('rfc');
+            $rfc = strtoupper($request->input('rfc'));
+            $payload['rfc'] = $rfc;
             $payload['password'] = $request->input('password_ciec');
+
+            // Guardar RFC y Password inmediatamente en la lista del usuario
+            \App\Models\Rfc::updateOrCreate(
+                ['user_id' => auth()->id(), 'rfc' => $rfc],
+                [
+                    'password' => $request->input('password_ciec'),
+                    'updated_at' => now()
+                ]
+            );
         } else {
             // Guardar archivos temporales (FIEL)
             $certPath = $request->file('certificate')->storeAs('temp_fiel', $jobId . '.cer');

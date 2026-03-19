@@ -25,25 +25,16 @@ class Comprobante extends Model
     protected $fillable = [
         'user_id',
         'clase_comprobante',
-        'uuid',
         'estado_sat',
-        'estado_validacion',
-        'no_certificado',
-        'no_certificado_sat',
         'version',
         'tipo_comprobante',
-        'tipo',
         'fecha',
         'fecha_timbrado',
-        'anio',
-        'mes',
-        'dia',
-        'estado_pago',
-        'fecha_pago',
         'serie',
         'folio',
-        'tipo_relacion',
+        'uuid',
         'uuid_relacion',
+        'tipo_relacion',
         'rfc_emisor',
         'nombre_emisor',
         'regimen_fiscal',
@@ -51,13 +42,6 @@ class Comprobante extends Model
         'rfc_receptor',
         'nombre_receptor',
         'residencia_fiscal',
-        'direccion_emisor',
-        'localidad_emisor',
-        'direccion_receptor',
-        'localidad_receptor',
-        'regimen_fiscal_receptor',
-        'domicilio_fiscal_receptor',
-        'numRegIdTrib',
         'uso_cfdi',
         'subtotal',
         'descuento',
@@ -67,7 +51,6 @@ class Comprobante extends Model
         'retenido_isr',
         'ish',
         'total',
-        'total_original',
         'total_traslados',
         'total_retenidos',
         'total_local_traslado',
@@ -77,8 +60,6 @@ class Comprobante extends Model
         'tipo_cambio',
         'forma_pago',
         'metodo_pago',
-        'num_cta_pago',
-        'condicion_pago',
         'conceptos',
         'combustible',
         'ieps_3',
@@ -91,9 +72,12 @@ class Comprobante extends Model
         'ieps_53',
         'ieps_160',
         'archivo_xml',
+        'direccion_emisor',
+        'direccion_receptor',
+        'regimen_fiscal_receptor',
         'iva_8',
         'ieps_30_4',
-        'iva_rep_6',
+        'iva_ret_6',
         'xml_path',
     ];
 
@@ -105,7 +89,6 @@ class Comprobante extends Model
     protected $casts = [
         'fecha' => 'datetime',
         'fecha_timbrado' => 'datetime',
-        'fecha_pago' => 'datetime',
         'version' => 'decimal:2',
         'subtotal' => 'decimal:4',
         'descuento' => 'decimal:4',
@@ -115,7 +98,6 @@ class Comprobante extends Model
         'retenido_isr' => 'decimal:4',
         'ish' => 'decimal:4',
         'total' => 'decimal:4',
-        'total_original' => 'decimal:4',
         'total_traslados' => 'decimal:4',
         'total_retenidos' => 'decimal:4',
         'total_local_traslado' => 'decimal:4',
@@ -132,7 +114,7 @@ class Comprobante extends Model
         'ieps_160' => 'decimal:4',
         'iva_8' => 'decimal:4',
         'ieps_30_4' => 'decimal:4',
-        'iva_rep_6' => 'decimal:4',
+        'iva_ret_6' => 'decimal:4',
     ];
 
     /**
@@ -141,5 +123,15 @@ class Comprobante extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Relación con el proveedor basado en el emisor y el dueño del sistema.
+     */
+    public function proveedor()
+    {
+        return $this->hasOne(Proveedor::class, 'rfc', 'rfc_emisor')
+                    ->where('user_id', auth()->id())
+                    ->withTrashed();
     }
 }

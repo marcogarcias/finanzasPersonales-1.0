@@ -53,4 +53,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(Comprobante::class);
     }
+
+    /**
+     * Get the RFCs for the user.
+     */
+    public function rfcs()
+    {
+        return $this->hasMany(Rfc::class);
+    }
 }

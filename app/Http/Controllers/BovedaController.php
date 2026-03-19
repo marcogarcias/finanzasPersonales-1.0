@@ -58,6 +58,7 @@ class BovedaController extends Controller
                     
                     $results = $query->where('clase_comprobante', $clase)
                                     ->where($targetColumn, $rfc)
+                                    ->selectRaw("strftime('%Y', fecha) as anio")
                                     ->distinct()
                                     ->orderBy('anio', 'desc')
                                     ->pluck('anio');
@@ -72,7 +73,8 @@ class BovedaController extends Controller
 
                     $results = $query->where('clase_comprobante', $clase)
                                     ->where($targetColumn, $rfc)
-                                    ->where('anio', $year)
+                                    ->whereYear('fecha', $year)
+                                    ->selectRaw("strftime('%m', fecha) as mes")
                                     ->distinct()
                                     ->orderBy('mes', 'asc')
                                     ->pluck('mes');
@@ -105,8 +107,12 @@ class BovedaController extends Controller
         $comprobantes = \App\Models\Comprobante::where('user_id', $userId)
             ->where($targetColumn, $rfc)
             ->where('clase_comprobante', $clase)
-            ->where('anio', $year)
-            ->whereIn('mes', $months)
+            ->whereYear('fecha', $year)
+            ->where(function($q) use ($months) {
+                foreach ($months as $m) {
+                    $q->orWhereMonth('fecha', $m);
+                }
+            })
             ->orderBy('fecha', 'desc')
             ->get();
 
@@ -154,12 +160,28 @@ class BovedaController extends Controller
         try {
             // 2. Obtener datos filtrados
             $targetColumn = ($clase === 'emitido') ? 'rfc_emisor' : 'rfc_receptor';
-            $comprobantes = \App\Models\Comprobante::where('user_id', $userId)
-                ->where($targetColumn, $rfc)
-                ->where('clase_comprobante', $clase)
-                ->where('anio', $year)
-                ->whereIn('mes', (array)$months)
-                ->orderBy('fecha', 'desc')
+            $comprobantes = \App\Models\Comprobante::leftJoin('proveedores', function($join) use ($userId) {
+                    $join->on('comprobantes.rfc_emisor', '=', 'proveedores.rfc')
+                         ->on('comprobantes.rfc_receptor', '=', 'proveedores.rfc_receptor')
+                         ->where('proveedores.user_id', '=', $userId);
+                })
+                ->where('comprobantes.user_id', $userId)
+                ->where('comprobantes.' . $targetColumn, $rfc)
+                ->where('comprobantes.clase_comprobante', $clase)
+                ->whereYear('comprobantes.fecha', $year)
+                ->where(function($q) use ($months) {
+                    foreach ((array)$months as $m) {
+                        $q->orWhereMonth('comprobantes.fecha', $m);
+                    }
+                })
+                ->select([
+                    'comprobantes.*',
+                    'proveedores.tipo_de_uso as prov_tipo_de_uso',
+                    'proveedores.efecto_fiscal as prov_efecto_fiscal',
+                    'proveedores.momento_fiscal as prov_momento_fiscal',
+                    'proveedores.categoria as prov_categoria',
+                ])
+                ->orderBy('comprobantes.fecha', 'desc')
                 ->get();
 
             // 3. Crear archivo CSV manualmente
@@ -171,29 +193,118 @@ class BovedaController extends Controller
 
             // Encabezados
             fputcsv($file, [
-                'UUID', 'Fecha', 'Folio', 'RFC Emisor', 'Nombre Emisor', 
-                'RFC Receptor', 'Nombre Receptor', 'Clase', 'Tipo', 
-                'Moneda', 'Subtotal', 'Descuento', 'IVA 16%', 'Total', 'Conceptos'
+                // INICIO. COLUMNAS CALCULADAS
+                'Importe Neto', 'Tasa IVA (s/reporte)', 'Tasa IVA final', 
+                'Base IVA 0%', 'Base IVA 16%', 'Comprobación vs Total Factura', 
+                'Comprobación vs Importe Neto',
+                // FIN. COLUMNAS CALCULADAS
+
+                // INICIO. COLUMNAS DEL XML
+                'UUID', 'UUID Relacionado', 'Tipo Relación', 'Estado SAT', 'Versión', 
+                'Tipo Comprobante', 'Fecha', 'Fecha Timbrado', 'Serie', 'Folio', 
+                'RFC Emisor', 'Nombre Emisor', 'Regimen Fiscal Emisor', 'Lugar De Expedición', 
+                'RFC Receptor', 'Nombre Receptor', 'Residencia Fiscal', 'Uso CFDI', 
+                'Regimen Fiscal Receptor', 'Subtotal', 'Descuento', 'Total IEPS', 
+                'IVA 16%', 'Retenido IVA', 'Retenido ISR', 'ISH', 'Total', 
+                'Total Traslados', 'Total Retenidos', 'Total Local Traslado', 
+                'Total Local Retenido', 'Complemento', 'Moneda', 'Tipo Cambio', 
+                'Forma Pago', 'Método Pago', 'Conceptos', 'Combustible', 
+                'IEPS 3%', 'IEPS 6%', 'IEPS 7%', 'IEPS 8%', 'IEPS 9%', 'IEPS 26.5%', 
+                'IEPS 30%', 'IEPS 53%', 'IEPS 160%', 'Archivo XML', 'Direccion Emisor', 
+                'Direccion Receptor', 
+                'IVA 8%', 'IEPS 30.4%', 'IVA Ret 6%',
+                // FIN. COLUMNAS DEL XML
+
+                // INICIO. COLUMNAS CALCULADAS
+                'Periodo Fiscal', 'Base Neta',
+                // FIN. COLUMNAS CALCULADAS
+
+                // INICIO. COLUMNAS DE PROVEEDORES
+                'Tipo de uso', 'Efecto Fiscal', 'Momento Fiscal', 'Categoría',
+                // FIN. COLUMNAS DE PROVEEDORES
             ]);
 
             // Datos
             foreach ($comprobantes as $c) {
                 fputcsv($file, [
+                    // INICIO. COLUMNAS CALCULADAS
+                    $c->importe_neto = $c->subtotal - $c->descuento,
+                    $c->tasa_iva = $c->iva_16 == 0 ? 0 : round($c->iva_16/$c->importe_neto, 2),
+                    //$c->base_iva_0 = ($c->tasa_iva<16 ? ($c->iva_16/0.16) : 0),
+                    $c->base_iva_0 = ($c->tasa_iva < 0.16 ? ($c->iva_16/0.16) : 0),
+                    $c->tasa_iva_final = ($c->base_iva_0 == 0 ? 0 : round($c->iva_16/$c->base_iva_0, 2)),
+                    $c->base_iva_16 = $c->importe_neto - $c->base_iva_0,
+                    $c->comprobacion_vs_total = $c->importe_neto + $c->iva_16 - $c->total,
+                    $c->comprobacion_vs_importe = $c->importe_neto - $c->base_iva_0 - $c->base_iva_16,
+                    // FIN. COLUMNAS CALCULADAS
+
+                    // INICIO. COLUMNAS DEL XML
                     $c->uuid,
-                    $c->fecha ? $c->fecha->format('Y-m-d H:i:s') : 'S/F',
-                    ($c->serie ?? '') . ($c->folio ?? ''),
+                    $c->uuid_relacion,
+                    $c->tipo_relacion,
+                    $c->estado_sat,
+                    $c->version,
+                    $c->tipo_comprobante,
+                    $c->fecha,
+                    $c->fecha_timbrado,
+                    $c->serie,
+                    $c->folio,
                     $c->rfc_emisor,
                     $c->nombre_emisor,
+                    $c->regimen_fiscal,
+                    $c->lugar_expedicion,
                     $c->rfc_receptor,
                     $c->nombre_receptor,
-                    $c->clase_comprobante,
-                    $c->tipo_comprobante,
-                    $c->moneda,
+                    $c->residencia_fiscal,
+                    $c->uso_cfdi,
+                    $c->regimen_fiscal_receptor,
                     $c->subtotal,
                     $c->descuento,
+                    $c->total_ieps,
                     $c->iva_16,
+                    $c->retenido_iva,
+                    $c->retenido_isr,
+                    $c->ish,
                     $c->total,
+                    $c->total_traslados,
+                    $c->total_retenidos,
+                    $c->total_local_traslado,
+                    $c->total_local_retenido,
+                    $c->complemento,
+                    $c->moneda,
+                    $c->tipo_cambio,
+                    $c->forma_pago,
+                    $c->metodo_pago,
                     $c->conceptos,
+                    $c->combustible,
+                    $c->ieps_3,
+                    $c->ieps_6,
+                    $c->ieps_7,
+                    $c->ieps_8,
+                    $c->ieps_9,
+                    $c->ieps_26_5,
+                    $c->ieps_30,
+                    $c->ieps_53,
+                    $c->ieps_160,
+                    $c->archivo_xml,
+                    $c->direccion_emisor,
+                    $c->direccion_receptor,
+                    $c->iva_8,
+                    $c->ieps_30_4,
+                    $c->iva_ret_6,
+                    // FIN. COLUMNAS DEL XML
+
+                    // INICIO. COLUMNAS CALCULADAS
+                    date('m', strtotime($c->fecha)),
+                    $c->subtotal - $c->descuento,
+                    // FIN. COLUMNAS CALCULADAS
+
+                    // INICIO. COLUMNAS DE PROVEEDORES (tabla proveedores)
+                    $c->prov_tipo_de_uso ?? '',
+                    $c->prov_efecto_fiscal ?? '',
+                    $c->prov_momento_fiscal ?? '',
+                    $c->prov_categoria ?? '',
+                    // FIN. COLUMNAS DE PROVEEDORES
                 ]);
             }
 

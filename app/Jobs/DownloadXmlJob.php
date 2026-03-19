@@ -91,9 +91,15 @@ class DownloadXmlJob implements ShouldQueue
                     $scraper = new SatScraper($sessionManager);
                     $this->updateStatus($jobId, 'searching', 15, "Autenticado como {$rfc}. Buscando CFDI...");
 
+                    // Guardar el RFC en la tabla de RFCs conocidos para el usuario
+                    \App\Models\Rfc::updateOrCreate(
+                        ['user_id' => $this->payload['user_id'], 'rfc' => strtoupper($rfc)],
+                        ['updated_at' => now()]
+                    );
+
                     // 3. Configurar Query
-                    $start = new DateTimeImmutable($this->payload['start_date']);
-                    $end = new DateTimeImmutable($this->payload['end_date']);
+                    $start = new DateTimeImmutable($this->payload['start_date'] . ' 00:00:00');
+                    $end = new DateTimeImmutable($this->payload['end_date'] . ' 23:59:59');
                     
                     $downloadType = $this->payload['download_type'] === 'emitidos' 
                         ? DownloadType::emitidos() 
@@ -209,21 +215,44 @@ class DownloadXmlJob implements ShouldQueue
                                     $this->payload['user_id'], 
                                     $clase, 
                                     $filePath,
-                                    $satStatus
+                                    $satStatus,
+                                    $uuid
                                 );
 
-                                // Guardar o actualizar en BD (Soportando registros previamente eliminados suavemente)
-                                // Usamos el UUID extraído del XML para la búsqueda por mayor precisión
+                                // Guardar o actualizar en BD
                                 $uuidFromXml = $parsedData['uuid'];
-                                $comprobante = Comprobante::withTrashed()->where('uuid', 'LIKE', $uuidFromXml)->first();
+                                $comprobante = Comprobante::withTrashed()->where('uuid', $uuidFromXml)->first();
                                 
                                 if ($comprobante) {
                                     if ($comprobante->trashed()) {
                                         $comprobante->restore();
                                     }
+                                    // Quitamos el uuid del update para evitar errores de integridad
+                                    unset($parsedData['uuid']);
                                     $comprobante->update($parsedData);
                                 } else {
                                     Comprobante::create($parsedData);
+                                }
+
+                                // --- NUEVA LÓGICA: Llenar tabla de Proveedores ---
+                                // Solo lo hacemos para facturas RECIBIDAS (donde el emisor es el proveedor)
+                                if ($clase === 'recibido' && !empty($parsedData['rfc_emisor'])) {
+                                    $prov = \App\Models\Proveedor::withTrashed()
+                                        ->where('user_id', $this->payload['user_id'])
+                                        ->where('rfc_receptor', $parsedData['rfc_receptor'])
+                                        ->where('rfc', $parsedData['rfc_emisor'])
+                                        ->first();
+                                    if ($prov) {
+                                        if ($prov->trashed()) $prov->restore();
+                                        $prov->update(['nombre' => $parsedData['nombre_emisor']]);
+                                    } else {
+                                        \App\Models\Proveedor::create([
+                                            'user_id' => $this->payload['user_id'],
+                                            'rfc_receptor' => $parsedData['rfc_receptor'],
+                                            'rfc' => $parsedData['rfc_emisor'],
+                                            'nombre' => $parsedData['nombre_emisor']
+                                        ]);
+                                    }
                                 }
                             } catch (\Exception $e) {
                                 \Illuminate\Support\Facades\Log::error("Error procesando XML {$uuid}: " . $e->getMessage());

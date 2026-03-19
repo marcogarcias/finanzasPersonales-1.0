@@ -51,6 +51,7 @@
                     <a href="/" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('/') ? 'bg-blue-900 text-white' : '' }}">Dashboard</a>
                     <a href="/descargas" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('descargas*') ? 'bg-blue-900 text-white' : '' }}">Descargar XML</a>
                     <a href="/boveda" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('boveda*') ? 'bg-blue-900 text-white' : '' }}">Bóveda XML</a>
+                    <a href="/proveedores" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('proveedores*') ? 'bg-blue-900 text-white' : '' }}">Proveedores</a>
                 </div>
 
                 <!-- Right Actions -->
@@ -189,6 +190,8 @@
             <div class="space-y-1 px-2 pb-3 pt-2 sm:px-3">
                 <a href="#" class="bg-blue-950 text-white block rounded-md px-3 py-2 text-base font-medium">Dashboard</a>
                 <a href="{{ route('download.index') }}" class="text-gray-300 hover:bg-blue-800 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Descargar XML</a>
+                <a href="{{ route('boveda.index') }}" class="text-gray-300 hover:bg-blue-800 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Bóveda XML</a>
+                <a href="{{ route('proveedores.index') }}" class="text-gray-300 hover:bg-blue-800 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Proveedores</a>
                 <a href="#" class="text-gray-300 hover:bg-blue-800 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Reportes</a>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf

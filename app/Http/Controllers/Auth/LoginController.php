@@ -42,7 +42,7 @@ class LoginController extends Controller
             // Por ahora, solo verificamos si ya tiene una cargada localmente.
             // En el futuro, este bloque llamará a tu servidor en la nube.
             
-            return redirect()->intended('dashboard');
+            return redirect()->intended(route('dashboard'));
         }
 
         return back()->withErrors([
