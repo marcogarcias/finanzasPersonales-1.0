@@ -20,11 +20,11 @@ return new class extends Migration
             $table->string('tipo_de_uso')->nullable();
             $table->string('efecto_fiscal')->nullable();
             $table->string('momento_fiscal')->nullable();
-            $table->string('categoria')->nullable();
             $table->text('concepto')->nullable();
             
-            // Relación con el catálogo de Uso CFDI
+            // Relación con catálogos
             $table->foreignId('uso_cfdi_id')->nullable()->constrained('cat_uso_cfdi')->onDelete('set null');
+            $table->foreignId('actividad_economica_id')->nullable()->constrained('actividades_economicas')->onDelete('set null'); // tambien tipo de erogación
 
             $table->unique(['user_id', 'rfc_receptor', 'rfc']);
 

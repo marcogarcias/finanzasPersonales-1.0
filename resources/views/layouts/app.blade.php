@@ -47,11 +47,70 @@
                 </div>
 
                 <!-- Desktop Menu -->
-                <div class="hidden md:flex space-x-8 items-center">
+                <div class="hidden md:flex space-x-6 items-center">
                     <a href="/" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('/') ? 'bg-blue-900 text-white' : '' }}">Dashboard</a>
                     <a href="/descargas" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('descargas*') ? 'bg-blue-900 text-white' : '' }}">Descargar XML</a>
                     <a href="/boveda" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('boveda*') ? 'bg-blue-900 text-white' : '' }}">Bóveda XML</a>
                     <a href="/proveedores" class="text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150 {{ request()->is('proveedores*') ? 'bg-blue-900 text-white' : '' }}">Proveedores</a>
+                    
+                    <!-- Dropdown Reportes Fiscales -->
+                    <div class="relative group" x-data="{ open: false, subOpen: null }" @mouseenter="open = true" @mouseleave="open = false; subOpen = null">
+                        <button class="inline-flex items-center text-gray-300 hover:bg-blue-800 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition duration-150">
+                            <span>Reportes Fiscales</span>
+                            <svg class="ml-1.5 h-4 w-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        
+                        <!-- Primer Nivel: Gastos / Ingresos -->
+                        <div x-show="open" 
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                             class="absolute left-0 mt-0 pt-2 w-56 z-50">
+                            <div class="rounded-xl bg-white shadow-xl border border-gray-100 py-2">
+                            
+                            <!-- Gastos con Segundo Nivel -->
+                            <div class="relative group/gastos" x-data="{ nested: false }" @mouseenter="nested = true" @mouseleave="nested = false">
+                                <button class="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
+                                    <span class="font-medium">Gastos</span>
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                                
+                                <!-- Segundo Nivel: G. Deducibles / Deducciones Personales -->
+                                <div x-show="nested" 
+                                     class="absolute left-full top-0 -ml-0.5 pl-2 w-56 z-50"
+                                     x-cloak>
+                                    <div class="rounded-xl bg-white shadow-xl border border-gray-100 py-2">
+                                        <a href="{{ route('reportes.gastos.deducibles') }}" class="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition">G. Deducibles</a>
+                                        <a href="#" class="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition">Deducciones Personales</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Ingresos con Segundo Nivel -->
+                            <div class="relative group/ingresos" x-data="{ nested: false }" @mouseenter="nested = true" @mouseleave="nested = false">
+                                <button class="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
+                                    <span class="font-medium">Ingresos</span>
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+
+                                <!-- Segundo Nivel: I. Acumulables -->
+                                <div x-show="nested" 
+                                     class="absolute left-full top-0 -ml-0.5 pl-2 w-56 z-50"
+                                     x-cloak>
+                                    <div class="rounded-xl bg-white shadow-xl border border-gray-100 py-2">
+                                        <a href="#" class="block px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition">I. Acumulables</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Right Actions -->

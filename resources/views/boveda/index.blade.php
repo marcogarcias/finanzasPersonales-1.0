@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="w-full h-full flex flex-col">
+<div x-data="{ sidebarOpen: true }" class="w-full h-full flex flex-col">
     <div class="flex justify-between items-center mb-6 shrink-0">
         <h1 class="text-2xl font-bold text-gray-800">Explorador de Bóveda</h1>
         <div class="flex gap-2">
@@ -10,11 +10,30 @@
         </div>
     </div>
 
-    <div class="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
+    <div class="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden relative">
         
+        <!-- Botón para reabrir sidebar cuando está cerrado -->
+        <button 
+            x-show="!sidebarOpen" 
+            @click="sidebarOpen = true"
+            class="absolute left-0 top-4 z-20 bg-blue-600 text-white p-2 rounded-r-lg shadow-lg hover:bg-blue-700 transition-all border border-blue-500 border-l-0"
+            style="display: none;"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+
         <!-- Sidebar / Filtros -->
-        <aside class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full overflow-y-auto">
-            <h2 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Filtros de Bóveda</h2>
+        <aside 
+            :class="sidebarOpen ? 'w-full lg:w-1/3 opacity-100' : 'w-0 opacity-0 overflow-hidden lg:mr-[-1.5rem] pointer-events-none'"
+            class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full overflow-y-auto transition-all duration-300 ease-in-out relative origin-left"
+        >
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-lg font-semibold text-gray-700">Filtros de Bóveda</h2>
+                <!-- Icono para contraer -->
+                <button @click="sidebarOpen = false" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Contraer filtros">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                </button>
+            </div>
             
             <form id="bovedaForm" class="space-y-5 flex-1">
                 <div class="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
@@ -64,7 +83,7 @@
         </aside>
 
         <!-- Main Content / Tabla -->
-         <section class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
+         <section :class="sidebarOpen ? '' : 'pl-8'" class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full transition-all duration-300">
             <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
                 <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide">Comprobantes en Base de Datos</h2>
                 <div class="flex items-center gap-4">

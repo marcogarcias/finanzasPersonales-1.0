@@ -114,8 +114,11 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
-                                <span class="text-xs font-medium text-gray-700 italic" x-text="prov.categoria || 'Sin categoría'"></span>
+                             <td class="px-6 py-4">
+                                <span class="text-xs font-medium text-gray-700 italic" x-text="prov.actividad_economica ? prov.actividad_economica.actividad : 'Sin categoría'"></span>
+                                <template x-if="prov.actividad_economica">
+                                    <div class="text-[9px] text-gray-400 font-bold uppercase" x-text="prov.actividad_economica.categoria"></div>
+                                </template>
                             </td>
                             <td class="px-6 py-4">
                                 <p class="text-xs text-gray-500 line-clamp-2 max-w-xs" x-text="prov.concepto || '--'"></p>
@@ -179,6 +182,8 @@
                                 <select x-model="editingProv.tipo_de_uso" class="w-full border-gray-200 rounded-xl text-sm font-medium focus:border-blue-500 focus:ring-blue-500">
                                     <option value="">Elige una opción</option>
                                     <option value="A. Empresarial">A. Empresarial</option>
+                                    <option value="Sin uso">Sin uso</option>
+                                    <option value="Deducciones Personales">Deducciones Personales</option>
                                 </select>
                             </div>
                             <div>
@@ -203,12 +208,19 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Categoría</label>
-                                <select x-model="editingProv.categoria" class="w-full border-gray-200 rounded-xl text-sm font-medium focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="">Elige una opción</option>
-                                    <option value="Alimentos">Alimentos</option>
-                                    <option value="Papelería">Papelería</option>
-                                    <option value="Gastos de oficina">Gastos de oficina</option>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Actividad Económica (Categoría)</label>
+                                <select x-model="editingProv.actividad_economica_id" class="w-full border-gray-200 rounded-xl text-sm font-medium focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="">-- Selecciona una actividad --</option>
+                                    @php $currentCat = null; @endphp
+                                    @foreach($actividades as $act)
+                                        @if($currentCat !== $act->categoria)
+                                            @if($currentCat !== null) </optgroup> @endif
+                                            <optgroup label="{{ strtoupper($act->categoria) }}">
+                                            @php $currentCat = $act->categoria; @endphp
+                                        @endif
+                                        <option value="{{ $act->id }}">{{ $act->actividad }}</option>
+                                    @endforeach
+                                    @if($currentCat !== null) </optgroup> @endif
                                 </select>
                             </div>
                         </div>

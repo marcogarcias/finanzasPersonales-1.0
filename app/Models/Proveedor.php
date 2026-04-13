@@ -20,9 +20,9 @@ class Proveedor extends Model
         'tipo_de_uso',
         'efecto_fiscal',
         'momento_fiscal',
-        'categoria',
         'concepto',
         'uso_cfdi_id',
+        'actividad_economica_id',
     ];
 
     /**
@@ -31,5 +31,13 @@ class Proveedor extends Model
     public function usoCfdi()
     {
         return $this->belongsTo(UsoCfdi::class, 'uso_cfdi_id');
+    }
+
+    /**
+     * Relación con la Actividad Económica.
+     */
+    public function actividadEconomica()
+    {
+        return $this->belongsTo(ActividadEconomica::class, 'actividad_economica_id');
     }
 }

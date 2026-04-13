@@ -14,7 +14,8 @@ class ProveedorController extends Controller
     {
         $userId = auth()->id();
         $rfcs = \App\Models\Rfc::where('user_id', $userId)->orderBy('rfc', 'asc')->get();
-        return view('proveedores.index', compact('rfcs'));
+        $actividades = \App\Models\ActividadEconomica::orderBy('categoria', 'asc')->orderBy('actividad', 'asc')->get();
+        return view('proveedores.index', compact('rfcs', 'actividades'));
     }
 
     /**
@@ -31,7 +32,7 @@ class ProveedorController extends Controller
             $query->where('rfc_receptor', $receptorRfc);
         }
 
-        $proveedores = $query->orderBy('nombre', 'asc')->get();
+        $proveedores = $query->with('actividadEconomica')->orderBy('nombre', 'asc')->get();
         return response()->json($proveedores);
     }
 
@@ -79,12 +80,12 @@ class ProveedorController extends Controller
         $proveedor = Proveedor::where('user_id', auth()->id())->findOrFail($id);
         
         $data = $request->validate([
-            'nombre'         => 'required|string|max:255',
-            'tipo_de_uso'    => 'nullable|string',
-            'efecto_fiscal'  => 'nullable|string',
-            'momento_fiscal' => 'nullable|string',
-            'categoria'      => 'nullable|string',
-            'concepto'       => 'nullable|string',
+            'nombre'                 => 'required|string|max:255',
+            'tipo_de_uso'            => 'nullable|string',
+            'efecto_fiscal'          => 'nullable|string',
+            'momento_fiscal'         => 'nullable|string',
+            'actividad_economica_id' => 'nullable|exists:actividades_economicas,id',
+            'concepto'               => 'nullable|string',
         ]);
 
         $proveedor->update($data);

@@ -51,5 +51,9 @@ Route::middleware(['auth', 'license'])->group(function () {
     Route::put('/api/proveedores/{id}', [ProveedorController::class, 'update'])->name('api.proveedores.update');
     Route::delete('/api/proveedores/{id}', [ProveedorController::class, 'destroy'])->name('api.proveedores.destroy');
 
+    // Reportes Fiscales
+    Route::get('/reportes/fiscales/gastos-deducibles', [\App\Http\Controllers\ReporteFiscalController::class, 'gastosDeducibles'])->name('reportes.gastos.deducibles');
+    Route::get('/api/reportes/fiscales/filters', [\App\Http\Controllers\ReporteFiscalController::class, 'getFiltersData'])->name('api.reportes.filters');
+
 });
 
